@@ -167,3 +167,23 @@ on delete cascade
 - 规则或规范, 表单字段, 业务场景, 功能描述
   详细表达, 不能让llm 去猜
 - llm 擅长的, 比如生成代码, 让它自己去跑。
+
+## 多端
+
+- PC 端
+  SEO 办公
+- h5 手机网页端
+  手机端适配
+- 客户端
+  - android
+  - ios
+    flutter/React Native
+- 桌面端
+  C/S架构 electron
+
+## h5 web 应用
+
+- nextjs 模版
+  不用从0开始开发
+- claer/compact 上下文
+  新项目重新启动新的对话窗口

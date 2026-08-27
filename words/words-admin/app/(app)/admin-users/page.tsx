@@ -1,12 +1,12 @@
-"use client"
+"use client";
 
-import * as React from "react"
+import * as React from "react";
 
-import { useAuth } from "@/components/auth/auth-provider"
-import type { AdminRole } from "@/lib/auth-types"
-import { PencilIcon, PlusIcon, Trash2Icon } from "lucide-react"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
+import { useAuth } from "@/components/auth/auth-provider";
+import type { AdminRole } from "@/lib/auth-types";
+import { PencilIcon, PlusIcon, Trash2Icon } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -14,16 +14,16 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select"
+} from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -31,138 +31,149 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table"
+} from "@/components/ui/table";
 
 type AdminRecord = {
-  id: string
-  name: string
-  email: string
-  role: AdminRole
-  createdAt: string
-}
+  id: string;
+  name: string;
+  email: string;
+  role: AdminRole;
+  createdAt: string;
+};
 
 const roleLabel: Record<AdminRole, string> = {
   system: "系统管理员",
   admin: "普通管理员",
-}
+};
 
 const roleVariant: Record<AdminRole, "default" | "secondary"> = {
   system: "default",
   admin: "secondary",
-}
+};
 
 function formatDate(iso: string) {
-  const date = new Date(iso)
+  const date = new Date(iso);
   return new Intl.DateTimeFormat("zh-CN", {
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
-  }).format(date)
+  }).format(date);
 }
 
 type FormState = {
-  name: string
-  email: string
-  password: string
-  role: AdminRole
-}
+  name: string;
+  email: string;
+  password: string;
+  role: AdminRole;
+};
 
 const emptyForm: FormState = {
   name: "",
   email: "",
   password: "",
   role: "admin",
-}
+};
 
 export default function AdminUsersPage() {
-  const { user } = useAuth()
+  const { user } = useAuth();
 
-  const [users, setUsers] = React.useState<AdminRecord[]>([])
-  const [loading, setLoading] = React.useState(true)
-  const [listError, setListError] = React.useState("")
+  const [users, setUsers] = React.useState<AdminRecord[]>([]);
+  const [loading, setLoading] = React.useState(true);
+  const [listError, setListError] = React.useState("");
 
-  const [dialogOpen, setDialogOpen] = React.useState(false)
-  const [editingId, setEditingId] = React.useState<string | null>(null)
-  const [form, setForm] = React.useState<FormState>(emptyForm)
-  const [formError, setFormError] = React.useState("")
-  const [pending, setPending] = React.useState(false)
+  const [dialogOpen, setDialogOpen] = React.useState(false);
+  const [editingId, setEditingId] = React.useState<string | null>(null);
+  const [form, setForm] = React.useState<FormState>(emptyForm);
+  const [formError, setFormError] = React.useState("");
+  const [pending, setPending] = React.useState(false);
 
   const [deleteTarget, setDeleteTarget] = React.useState<AdminRecord | null>(
-    null
-  )
+    null,
+  );
 
-  const isSystemAdmin = user?.role === "system"
+  const isSystemAdmin = user?.role === "system";
+  const editingSelf = editingId != null && editingId === user?.id;
 
   const fetchUsers = React.useCallback(async () => {
-    setLoading(true)
-    setListError("")
+    setLoading(true);
+    setListError("");
     try {
-      const res = await fetch("/api/admin-users", { cache: "no-store" })
-      const data = await res.json()
+      const res = await fetch("/api/admin-users", { cache: "no-store" });
+      const data = await res.json();
       if (!res.ok) {
-        setListError(data.error ?? "加载失败")
-        return
+        setListError(data.error ?? "加载失败");
+        return;
       }
-      setUsers(data.users ?? [])
+      setUsers(data.users ?? []);
     } catch {
-      setListError("网络异常")
+      setListError("网络异常");
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }, [])
+  }, []);
 
   React.useEffect(() => {
-    if (isSystemAdmin) fetchUsers()
-  }, [isSystemAdmin, fetchUsers])
+    if (isSystemAdmin) fetchUsers();
+  }, [isSystemAdmin, fetchUsers]);
 
   function openCreate() {
-    setEditingId(null)
-    setForm(emptyForm)
-    setFormError("")
-    setDialogOpen(true)
+    setEditingId(null);
+    setForm(emptyForm);
+    setFormError("");
+    setDialogOpen(true);
   }
 
   function openEdit(admin: AdminRecord) {
-    setEditingId(admin.id)
+    setEditingId(admin.id);
     setForm({
       name: admin.name,
       email: admin.email,
       password: "",
       role: admin.role,
-    })
-    setFormError("")
-    setDialogOpen(true)
+    });
+    setFormError("");
+    setDialogOpen(true);
   }
 
   async function handleSubmit(event: React.FormEvent) {
-    event.preventDefault()
-    setFormError("")
+    event.preventDefault();
+    setFormError("");
 
     if (!form.name.trim()) {
-      setFormError("请输入姓名")
-      return
+      setFormError("请输入姓名");
+      return;
     }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
-      setFormError("请输入有效的邮箱地址")
-      return
+      setFormError("请输入有效的邮箱地址");
+      return;
+    }
+    // 邮箱不能重复: 与已存在的管理员比对(编辑时排除自身)
+    const emailTaken = users.some(
+      (u) =>
+        u.email.toLowerCase() === form.email.trim().toLowerCase() &&
+        u.id !== editingId,
+    );
+    if (emailTaken) {
+      setFormError("该邮箱已被其他管理员使用，请更换");
+      return;
     }
     if (editingId) {
       if (form.password && form.password.length < 6) {
-        setFormError("新密码至少需要 6 位")
-        return
+        setFormError("新密码至少需要 6 位");
+        return;
       }
     } else if (form.password.length < 6) {
-      setFormError("密码至少需要 6 位")
-      return
+      setFormError("密码至少需要 6 位");
+      return;
     }
 
-    setPending(true)
+    setPending(true);
     const payload = {
       name: form.name,
       email: form.email,
       role: form.role,
       ...(form.password ? { password: form.password } : {}),
-    }
+    };
 
     const res = await fetch(
       editingId ? `/api/admin-users/${editingId}` : "/api/admin-users",
@@ -170,26 +181,26 @@ export default function AdminUsersPage() {
         method: editingId ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
-      }
-    )
-    const data = await res.json()
-    setPending(false)
+      },
+    );
+    const data = await res.json();
+    setPending(false);
 
     if (!res.ok) {
-      setFormError(data.error ?? "操作失败")
-      return
+      setFormError(data.error ?? "操作失败");
+      return;
     }
-    setDialogOpen(false)
-    fetchUsers()
+    setDialogOpen(false);
+    fetchUsers();
   }
 
   async function confirmDelete() {
-    if (!deleteTarget) return
+    if (!deleteTarget) return;
     const res = await fetch(`/api/admin-users/${deleteTarget.id}`, {
       method: "DELETE",
-    })
-    setDeleteTarget(null)
-    if (res.ok) fetchUsers()
+    });
+    setDeleteTarget(null);
+    if (res.ok) fetchUsers();
   }
 
   if (user && !isSystemAdmin) {
@@ -200,7 +211,7 @@ export default function AdminUsersPage() {
           您没有权限访问该功能。
         </div>
       </div>
-    )
+    );
   }
 
   return (
@@ -259,7 +270,7 @@ export default function AdminUsersPage() {
               users.map((admin) => {
                 const isSelf =
                   admin.id === user?.id ||
-                  admin.email.toLowerCase() === user?.email.toLowerCase()
+                  admin.email.toLowerCase() === user?.email.toLowerCase();
                 return (
                   <TableRow key={admin.id}>
                     <TableCell className="font-medium">
@@ -301,7 +312,7 @@ export default function AdminUsersPage() {
                       </Button>
                     </TableCell>
                   </TableRow>
-                )
+                );
               })
             )}
           </TableBody>
@@ -311,8 +322,8 @@ export default function AdminUsersPage() {
       <Dialog
         open={dialogOpen}
         onOpenChange={(open) => {
-          setDialogOpen(open)
-          if (!open) setFormError("")
+          setDialogOpen(open);
+          if (!open) setFormError("");
         }}
       >
         <DialogContent>
@@ -364,6 +375,7 @@ export default function AdminUsersPage() {
               <Label htmlFor="admin-role">角色</Label>
               <Select
                 value={form.role}
+                disabled={editingSelf}
                 onValueChange={(v) =>
                   setForm((f) => ({
                     ...f,
@@ -379,6 +391,11 @@ export default function AdminUsersPage() {
                   <SelectItem value="admin">普通管理员</SelectItem>
                 </SelectContent>
               </Select>
+              {editingSelf && (
+                <p className="text-xs text-muted-foreground">
+                  不能修改自己的角色
+                </p>
+              )}
             </div>
             {formError && (
               <p className="text-sm text-destructive" role="alert">
@@ -423,5 +440,5 @@ export default function AdminUsersPage() {
         </DialogContent>
       </Dialog>
     </div>
-  )
+  );
 }

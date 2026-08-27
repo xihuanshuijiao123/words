@@ -20,22 +20,20 @@ import { Label } from "@/components/ui/label"
 
 function SigninForm() {
   const router = useRouter()
-  const { signin, hasAdmin, user, isReady } = useAuth()
+  const { signin, hasAdmin, isReady } = useAuth()
 
   const [email, setEmail] = React.useState("")
   const [password, setPassword] = React.useState("")
   const [error, setError] = React.useState("")
   const [pending, setPending] = React.useState(false)
 
-  // 无管理员数据时去注册; 已登录则直接进入后台
+  // 首次使用(无管理员数据)时去注册; 登录页不自动跳转到后台, 仅在提交表单后进入 /books
   React.useEffect(() => {
     if (!isReady) return
     if (!hasAdmin) {
       router.replace("/signup")
-    } else if (user) {
-      router.replace("/books")
     }
-  }, [isReady, hasAdmin, user, router])
+  }, [isReady, hasAdmin, router])
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault()

@@ -53,8 +53,11 @@ export async function PATCH(request: Request, { params }: Params) {
 
   const name = body.name?.trim() ?? target.name;
   const email = body.email?.trim().toLowerCase() ?? target.email;
-  const role =
-    body.role === "system"
+  // 系统管理员不能修改自己的角色，只能修改他人的角色
+  const isSelf = auth.session.id === id;
+  const role = isSelf
+    ? target.role
+    : body.role === "system"
       ? "system"
       : body.role === "admin"
         ? "admin"
@@ -78,7 +81,7 @@ export async function PATCH(request: Request, { params }: Params) {
     if (count <= 1) {
       return NextResponse.json(
         { error: "必须至少保留一名系统管理员" },
-        { status: 400 }
+        { status: 400 },
       );
     }
   }
@@ -101,7 +104,7 @@ export async function DELETE(_request: Request, { params }: Params) {
   if (auth.session.id === id) {
     return NextResponse.json(
       { error: "不能删除当前登录账户" },
-      { status: 400 }
+      { status: 400 },
     );
   }
 
@@ -117,7 +120,7 @@ export async function DELETE(_request: Request, { params }: Params) {
     if (count <= 1) {
       return NextResponse.json(
         { error: "必须至少保留一名系统管理员" },
-        { status: 400 }
+        { status: 400 },
       );
     }
   }

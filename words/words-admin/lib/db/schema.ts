@@ -1,4 +1,13 @@
-import { pgTable, pgEnum, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import {
+  bigint,
+  integer,
+  json,
+  pgEnum,
+  pgTable,
+  text,
+  timestamp,
+  uuid,
+} from "drizzle-orm/pg-core";
 
 // 管理员角色: system = 系统管理员 (拥有全部权限), admin = 普通管理员
 export const userRoleEnum = pgEnum("user_role", ["system", "admin"]);
@@ -26,4 +35,16 @@ export const adminSessions = pgTable("admin-session", {
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
+});
+
+// 单词数据表, 对应 Supabase 中的 public.words 表
+// id 使用 bigint 自增(identity); content 以 JSON 形式保存完整词条
+export const words = pgTable("words", {
+  id: bigint("id", { mode: "number" })
+    .generatedByDefaultAsIdentity()
+    .primaryKey(),
+  wordRank: integer("wordRank"),
+  headWord: text("headWord"),
+  content: json("content"),
+  bookId: text("bookId"),
 });

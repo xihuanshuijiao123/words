@@ -1,12 +1,11 @@
-"use client"
+"use client";
 
-import * as React from "react"
+import * as React from "react";
 
-import { generateId } from "@/lib/auth"
-import { type WordBook, readBooks, seedBooks, writeBooks } from "@/lib/books"
-import { PlusIcon, SearchIcon, PencilIcon, Trash2Icon } from "lucide-react"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
+import type { Book } from "@/lib/books";
+import { PencilIcon, PlusIcon, SearchIcon, Trash2Icon } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -14,9 +13,9 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Table,
   TableBody,
@@ -24,126 +23,141 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table"
-
-const languages = ["英语", "中文", "日语", "韩语", "法语"]
+} from "@/components/ui/table";
 
 type BookForm = {
-  name: string
-  description: string
-  language: string
-  wordCount: string
-}
+  title: string;
+  wordCount: string;
+  coverUrl: string;
+  bookId: string;
+  tags: string;
+};
 
 const emptyForm: BookForm = {
-  name: "",
-  description: "",
-  language: languages[0],
+  title: "",
   wordCount: "",
-}
-
-function formatDate(iso: string) {
-  const date = new Date(iso)
-  return new Intl.DateTimeFormat("zh-CN", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(date)
-}
+  coverUrl: "",
+  bookId: "",
+  tags: "",
+};
 
 export default function BooksPage() {
-  const [books, setBooks] = React.useState<WordBook[]>([])
-  const [search, setSearch] = React.useState("")
-  const [formOpen, setFormOpen] = React.useState(false)
-  const [editing, setEditing] = React.useState<WordBook | null>(null)
-  const [form, setForm] = React.useState<BookForm>(emptyForm)
-  const [formError, setFormError] = React.useState("")
-  const [deleteTarget, setDeleteTarget] = React.useState<WordBook | null>(null)
+  const [books, setBooks] = React.useState<Book[]>([]);
+  const [loading, setLoading] = React.useState(true);
+  const [listError, setListError] = React.useState("");
+  const [search, setSearch] = React.useState("");
+
+  const [formOpen, setFormOpen] = React.useState(false);
+  const [editingId, setEditingId] = React.useState<string | null>(null);
+  const [form, setForm] = React.useState<BookForm>(emptyForm);
+  const [formError, setFormError] = React.useState("");
+  const [pending, setPending] = React.useState(false);
+
+  const [deleteTarget, setDeleteTarget] = React.useState<Book | null>(null);
+
+  const fetchBooks = React.useCallback(async () => {
+    setLoading(true);
+    setListError("");
+    try {
+      const res = await fetch("/api/books", { cache: "no-store" });
+      const data = await res.json();
+      if (!res.ok) {
+        setListError(data.error ?? "加载失败");
+        return;
+      }
+      setBooks(data.books ?? []);
+    } catch {
+      setListError("网络异常");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   React.useEffect(() => {
-    setBooks(seedBooks())
-  }, [])
-
-  function persist(nextBooks: WordBook[]) {
-    writeBooks(nextBooks)
-    setBooks(nextBooks)
-  }
+    fetchBooks();
+  }, [fetchBooks]);
 
   function openCreate() {
-    setEditing(null)
-    setForm(emptyForm)
-    setFormError("")
-    setFormOpen(true)
+    setEditingId(null);
+    setForm(emptyForm);
+    setFormError("");
+    setFormOpen(true);
   }
 
-  function openEdit(book: WordBook) {
-    setEditing(book)
+  function openEdit(book: Book) {
+    setEditingId(book.id);
     setForm({
-      name: book.name,
-      description: book.description,
-      language: book.language,
+      title: book.title,
       wordCount: String(book.wordCount),
-    })
-    setFormError("")
-    setFormOpen(true)
+      coverUrl: book.coverUrl ?? "",
+      bookId: book.bookId,
+      tags: book.tags ?? "",
+    });
+    setFormError("");
+    setFormOpen(true);
   }
 
-  function handleSave(event: React.FormEvent) {
-    event.preventDefault()
-    setFormError("")
+  async function handleSave(event: React.FormEvent) {
+    event.preventDefault();
+    setFormError("");
 
-    const name = form.name.trim()
-    const wordCount = Number(form.wordCount)
+    const title = form.title.trim();
+    const wordCount = Number(form.wordCount);
+    const bookId = form.bookId.trim();
 
-    if (!name) {
-      setFormError("请输入单词书名称")
-      return
+    if (!title) {
+      setFormError("请输入标题");
+      return;
     }
-    if (!form.language) {
-      setFormError("请选择语言")
-      return
+    if (!bookId) {
+      setFormError("请输入 bookId");
+      return;
     }
     if (Number.isNaN(wordCount) || wordCount < 0) {
-      setFormError("请输入有效的单词数量")
-      return
+      setFormError("请输入有效的单词数量");
+      return;
     }
 
-    if (editing) {
-      const next = books.map((b) =>
-        b.id === editing.id
-          ? {
-              ...b,
-              name,
-              description: form.description.trim(),
-              language: form.language,
-              wordCount,
-            }
-          : b
-      )
-      persist(next)
-    } else {
-      const book: WordBook = {
-        id: generateId(),
-        name,
-        description: form.description.trim(),
-        language: form.language,
-        wordCount,
-        createdAt: new Date().toISOString(),
-      }
-      persist([book, ...books])
+    setPending(true);
+    const payload = {
+      title,
+      wordCount,
+      coverUrl: form.coverUrl.trim(),
+      bookId,
+      tags: form.tags.trim(),
+    };
+
+    const res = await fetch(
+      editingId ? `/api/books/${editingId}` : "/api/books",
+      {
+        method: editingId ? "PATCH" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      },
+    );
+    const data = await res.json();
+    setPending(false);
+
+    if (!res.ok) {
+      setFormError(data.error ?? "操作失败");
+      return;
     }
-    setFormOpen(false)
+    setFormOpen(false);
+    fetchBooks();
   }
 
-  function confirmDelete() {
-    if (!deleteTarget) return
-    persist(books.filter((b) => b.id !== deleteTarget.id))
-    setDeleteTarget(null)
+  async function confirmDelete() {
+    if (!deleteTarget) return;
+    const res = await fetch(`/api/books/${deleteTarget.id}`, {
+      method: "DELETE",
+    });
+    setDeleteTarget(null);
+    if (res.ok) fetchBooks();
   }
 
   const filtered = books.filter((b) =>
-    b.name.toLowerCase().includes(search.trim().toLowerCase())
-  )
+    b.title.toLowerCase().includes(search.trim().toLowerCase()),
+  );
 
   return (
     <div className="grid gap-4">
@@ -162,7 +176,7 @@ export default function BooksPage() {
         <SearchIcon className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
         <Input
           className="pl-8"
-          placeholder="搜索单词书名称"
+          placeholder="搜索单词书标题"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
@@ -172,61 +186,110 @@ export default function BooksPage() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>名称</TableHead>
-              <TableHead>描述</TableHead>
-              <TableHead>语言</TableHead>
-              <TableHead className="text-right">单词数</TableHead>
-              <TableHead>创建时间</TableHead>
+              <TableHead>封面</TableHead>
+              <TableHead>标题</TableHead>
+              <TableHead className="text-right">单词数量</TableHead>
+              <TableHead>bookId</TableHead>
+              <TableHead>标签</TableHead>
               <TableHead className="text-right">操作</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filtered.length === 0 ? (
+            {loading ? (
               <TableRow>
-                <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
+                <TableCell
+                  colSpan={6}
+                  className="h-24 text-center text-muted-foreground"
+                >
+                  加载中…
+                </TableCell>
+              </TableRow>
+            ) : listError ? (
+              <TableRow>
+                <TableCell
+                  colSpan={6}
+                  className="h-24 text-center text-destructive"
+                >
+                  {listError}
+                </TableCell>
+              </TableRow>
+            ) : filtered.length === 0 ? (
+              <TableRow>
+                <TableCell
+                  colSpan={6}
+                  className="h-24 text-center text-muted-foreground"
+                >
                   暂无单词书
                 </TableCell>
               </TableRow>
             ) : (
-              filtered.map((book) => (
-                <TableRow key={book.id}>
-                  <TableCell className="font-medium">{book.name}</TableCell>
-                  <TableCell className="max-w-xs truncate text-muted-foreground">
-                    {book.description || "—"}
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="secondary">{book.language}</Badge>
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums">
-                    {book.wordCount.toLocaleString()}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {formatDate(book.createdAt)}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex justify-end gap-1">
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        onClick={() => openEdit(book)}
-                        aria-label="编辑"
-                        title="编辑"
-                      >
-                        <PencilIcon />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        onClick={() => setDeleteTarget(book)}
-                        aria-label="删除"
-                        title="删除"
-                      >
-                        <Trash2Icon />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))
+              filtered.map((book) => {
+                const tagList =
+                  book.tags
+                    ?.split(",")
+                    .map((t) => t.trim())
+                    .filter(Boolean) ?? [];
+                return (
+                  <TableRow key={book.id}>
+                    <TableCell>
+                      {book.coverUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={book.coverUrl}
+                          alt={book.title}
+                          className="h-12 w-12 rounded-md object-cover"
+                        />
+                      ) : (
+                        <div className="flex h-12 w-12 items-center justify-center rounded-md bg-muted text-xs text-muted-foreground">
+                          无封面
+                        </div>
+                      )}
+                    </TableCell>
+                    <TableCell className="font-medium">{book.title}</TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {book.wordCount.toLocaleString()}
+                    </TableCell>
+                    <TableCell className="font-mono text-sm">
+                      {book.bookId}
+                    </TableCell>
+                    <TableCell>
+                      {tagList.length > 0 ? (
+                        <div className="flex flex-wrap gap-1">
+                          {tagList.map((tag) => (
+                            <Badge key={tag} variant="secondary">
+                              {tag}
+                            </Badge>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          onClick={() => openEdit(book)}
+                          aria-label="编辑"
+                          title="编辑"
+                        >
+                          <PencilIcon />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          onClick={() => setDeleteTarget(book)}
+                          aria-label="删除"
+                          title="删除"
+                        >
+                          <Trash2Icon />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                );
+              })
             )}
           </TableBody>
         </Table>
@@ -235,48 +298,22 @@ export default function BooksPage() {
       <Dialog open={formOpen} onOpenChange={setFormOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{editing ? "编辑单词书" : "新增单词书"}</DialogTitle>
+            <DialogTitle>{editingId ? "编辑单词书" : "新增单词书"}</DialogTitle>
             <DialogDescription>
-              填写单词书的基本信息，带 * 为必填项。
+              填写单词书的信息，带 * 为必填项。标签使用逗号分隔。
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleSave} className="grid gap-4">
             <div className="grid gap-2">
-              <Label htmlFor="book-name">
-                名称 <span className="text-destructive">*</span>
+              <Label htmlFor="book-title">
+                标题 <span className="text-destructive">*</span>
               </Label>
               <Input
-                id="book-name"
+                id="book-title"
                 placeholder="例如：考研英语 5500 词"
-                value={form.name}
-                onChange={(e) => setForm({ ...form, name: e.target.value })}
+                value={form.title}
+                onChange={(e) => setForm({ ...form, title: e.target.value })}
               />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="book-description">描述</Label>
-              <Input
-                id="book-description"
-                placeholder="简单描述这本单词书"
-                value={form.description}
-                onChange={(e) => setForm({ ...form, description: e.target.value })}
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="book-language">
-                语言 <span className="text-destructive">*</span>
-              </Label>
-              <select
-                id="book-language"
-                value={form.language}
-                onChange={(e) => setForm({ ...form, language: e.target.value })}
-                className="h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30"
-              >
-                {languages.map((lang) => (
-                  <option key={lang} value={lang}>
-                    {lang}
-                  </option>
-                ))}
-              </select>
             </div>
             <div className="grid gap-2">
               <Label htmlFor="book-word-count">
@@ -288,7 +325,40 @@ export default function BooksPage() {
                 min={0}
                 placeholder="例如：5500"
                 value={form.wordCount}
-                onChange={(e) => setForm({ ...form, wordCount: e.target.value })}
+                onChange={(e) =>
+                  setForm({ ...form, wordCount: e.target.value })
+                }
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="book-cover-url">封面 URL</Label>
+              <Input
+                id="book-cover-url"
+                placeholder="https://example.com/cover.png"
+                value={form.coverUrl}
+                onChange={(e) =>
+                  setForm({ ...form, coverUrl: e.target.value })
+                }
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="book-book-id">
+                bookId <span className="text-destructive">*</span>
+              </Label>
+              <Input
+                id="book-book-id"
+                placeholder="例如：PEPXiaoXue3_1"
+                value={form.bookId}
+                onChange={(e) => setForm({ ...form, bookId: e.target.value })}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="book-tags">标签（逗号分隔）</Label>
+              <Input
+                id="book-tags"
+                placeholder="例如：K12,小学生,人教版"
+                value={form.tags}
+                onChange={(e) => setForm({ ...form, tags: e.target.value })}
               />
             </div>
             {formError && (
@@ -304,18 +374,23 @@ export default function BooksPage() {
               >
                 取消
               </Button>
-              <Button type="submit">{editing ? "保存" : "创建"}</Button>
+              <Button type="submit" disabled={pending}>
+                {pending ? "保存中…" : editingId ? "保存" : "创建"}
+              </Button>
             </DialogFooter>
           </form>
         </DialogContent>
       </Dialog>
 
-      <Dialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+      <Dialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => !open && setDeleteTarget(null)}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>删除单词书</DialogTitle>
             <DialogDescription>
-              确定要删除「{deleteTarget?.name}」吗？此操作无法撤销。
+              确定要删除「{deleteTarget?.title}」吗？此操作无法撤销。
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -329,5 +404,5 @@ export default function BooksPage() {
         </DialogContent>
       </Dialog>
     </div>
-  )
+  );
 }

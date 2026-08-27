@@ -48,3 +48,20 @@ export const words = pgTable("words", {
   content: json("content"),
   bookId: text("bookId"),
 });
+
+// 单词书表, 保存单词书的元数据信息
+// bookId 作为对外关联键, 与 words.bookId 建立逻辑关联
+export const books = pgTable("books", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  title: text("title").notNull(),
+  wordCount: integer("word_count").notNull().default(0),
+  coverUrl: text("cover_url"),
+  bookId: text("book_id").notNull().unique(),
+  tags: text("tags"),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});

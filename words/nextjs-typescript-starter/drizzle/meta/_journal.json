@@ -1,0 +1,13 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1787835381000,
+      "tag": "0000_study_progress_word_records",
+      "breakpoints": true
+    }
+  ]
+}

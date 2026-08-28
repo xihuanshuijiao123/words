@@ -10,14 +10,12 @@ export const authConfig = {
   ],
   callbacks: {
     authorized({ auth, request: { nextUrl } }) {
-      let isLoggedIn = !!auth?.user;
+      // 仅对 /protected 等受保护页面做鉴权；其余页面（首页/学习页/详情页等）允许访问，
+      // 登录态由前端 mock 的 AuthProvider 管理，避免路由被强制重定向。
       let isOnDashboard = nextUrl.pathname.startsWith('/protected');
 
       if (isOnDashboard) {
-        if (isLoggedIn) return true;
-        return false; // Redirect unauthenticated users to login page
-      } else if (isLoggedIn) {
-        return Response.redirect(new URL('/protected', nextUrl));
+        return !!auth?.user; // 未登录重定向到登录页
       }
 
       return true;
